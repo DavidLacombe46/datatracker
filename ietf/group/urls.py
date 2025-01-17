@@ -1,4 +1,4 @@
-# Copyright The IETF Trust 2013-2020, All Rights Reserved
+# Copyright The IETF Trust 2013-2023, All Rights Reserved
 
 from django.conf import settings
 from django.urls import include
@@ -20,7 +20,6 @@ info_detail_urls = [
     url(r'^documents/subscription/$', community_views.subscription),
     url(r'^charter/$', views.group_about),
     url(r'^about/$', views.group_about),
-    url(r'^about/rendertest/$', views.group_about_rendertest),
     url(r'^about/status/$', views.group_about_status),
     url(r'^about/status/edit/$', views.group_about_status_edit),
     url(r'^about/status/meeting/(?P<num>\d+)/$', views.group_about_status_meeting),
@@ -48,11 +47,19 @@ info_detail_urls = [
     url(r'^secretarysettings/$', views.change_review_secretary_settings),
     url(r'^reset_next_reviewer/$', views.reset_next_reviewer),
     url(r'^email-aliases/$', RedirectView.as_view(pattern_name=views.email,permanent=False),name='ietf.group.urls_info_details.redirect.email'),
+    url(r'^statements/$', views.statements),
+    url(r'^appeals/$', views.appeals),
+    url(r'^appeals/artifact/(?P<artifact_id>\d+)$', views.appeal_artifact),
+    url(r'^appeals/artifact/(?P<artifact_id>\d+)/markdown$', views.appeal_artifact_markdown),
+
+
 ]
 
 
 group_urls = [
-    url(r'^$', views.active_groups), 
+    url(r'^$', views.active_groups),
+    url(r'^leadership/(?P<group_type>(wg|rg))/$', views.group_leadership),
+    url(r'^leadership/(?P<group_type>(wg|rg))/csv/$', views.group_leadership_csv),
     url(r'^groupstats.json', views.group_stats_data, None, 'ietf.group.views.group_stats_data'),
     url(r'^groupmenu.json', views.group_menu_data, None, 'ietf.group.views.group_menu_data'),
     url(r'^chartering/$', views.chartering_groups),

@@ -69,7 +69,7 @@ figure {
 blockquote {
   @include margin-paragraph; // margin: var(--paragraph);
   padding-left: calc(2ch - 2px);
-  border-left: 2px solid darkgrey;
+  border-left: 2px solid var(--bs-border-color);
 }
 
 /* Header junk */
@@ -165,6 +165,7 @@ blockquote {
   #identifiers dd.authors .author {
     display: inline-block;
     margin: 0 2ch 0 1ch;
+    min-height: calc(2 * var(--line));
   }
   #identifiers dd.authors .author:last-of-type {
     margin-right: 0;
@@ -343,7 +344,7 @@ div:is(.artwork, .sourcecode) pre {
   flex: 0 0 content;
   margin: 0;
   max-width: 72ch;
-  overflow: auto;
+  overflow: auto clip;
 }
 div:is(.artwork, .sourcecode) .pilcrow {
   flex: 0 0 1ch;
@@ -374,7 +375,7 @@ thead, tfoot {
   border-bottom-style: double;
 }
 td, th {
-  border: 1px solid black;
+  border: 1px solid var(--bs-border-color);
   // padding: var(--half-line) 1ch;
   padding-top: var(--half-line);
   padding-right: 1ch;
@@ -393,7 +394,7 @@ td, th {
 
 /* Links */
 a.selfRef, a.pilcrow, .iref + a.internal {
-  color: black;
+  color: inherit;
   text-decoration: none;
 }
 a.relref, a.xref {
@@ -424,8 +425,8 @@ sup, sub {
 /* Authors */
 address, address.vcard {
   font-style: normal;
-  // margin: 2em 0 var(--line) 3ch;
-  margin-top: 2em;
+  // margin: var(--line) 0 var(--line) 3ch
+  margin-top: var(--line);
   margin-right: 0;
   margin-bottom: var(--line);
   margin-left: 3ch;
@@ -448,5 +449,20 @@ section > p, section > dl.references > dd {
    * Mostly this exists so that long URLs wrap properly in Safari, which
    * doesn't break words at '/' like other browsers. */
   overflow-wrap: break-word;
+}
+
+/* From https://github.com/martinthomson/rfc-css/blob/main/rfc.css */
+/* SVG Trick: a prefix match works because only black and white are allowed */
+svg :is([stroke="black"], [stroke^="#000"]) {
+    stroke: var(--bs-body-color);
+}
+svg :is([stroke="white"], [stroke^="#fff"]) {
+    stroke: var(--bs-body-bg);
+}
+svg :is([fill="black"], [fill^="#000"], :not([fill])) {
+    fill: var(--bs-body-color);
+}
+svg :is([fill="white"], [fill^="#fff"]) {
+    fill: var(--bs-body-bg);
 }
 }

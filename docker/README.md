@@ -6,7 +6,7 @@
 
 > See the [IETF Tools Windows Dev guide](https://github.com/ietf-tools/.github/blob/main/docs/windows-dev.md) on how to get started when using Windows.
 
-2. On Linux, you must also install [Docker Compose](https://docs.docker.com/compose/install/). Docker Desktop for Mac and Windows already include Docker Compose.
+2. On Linux, you must [install Docker Compose manually](https://docs.docker.com/compose/install/linux/#install-the-plugin-manually) and not install Docker Desktop. On Mac and Windows install Docker Desktop which already includes Docker Compose.
 
 2. If you have a copy of the datatracker code checked out already, simply `cd` to the top-level directory.
 
@@ -45,7 +45,7 @@ You can also open the datatracker project folder and click the **Reopen in conta
 
 ### Usage
 
-- Under the **Run and Debug** tab, you can run the server with the debugger attached using **Run Server** (F5). Once the server is ready to accept connections, you'll be prompted to open in a browser. You can also open [http://localhost:8000](http://localhost:8000) in a browser.
+- Under the **Run and Debug** tab, you can run the server with the debugger attached using **Run Server** (F5). Once the server is ready to accept connections, you'll be prompted to open in a browser. Navigate to [http://localhost:8000](http://localhost:8000) in your preferred browser.
 
     > An alternate profile **Run Server with Debug Toolbar** is also available from the dropdown menu, which displays various tools
     on top of the webpage. However, note that this configuration has a significant performance impact.
@@ -64,11 +64,7 @@ You can also open the datatracker project folder and click the **Reopen in conta
 
     ![](assets/vscode-terminal-new.png)
 
-- Under the **SQL Tools** tab, a connection **Local Dev** is preconfigured to connect to the DB container. Using this tool, you can list tables, view records and execute SQL queries directly from VS Code.
-
-    > The port `3306` is also exposed to the host automatically, should you prefer to use your own SQL tool.
-
-    ![](assets/vscode-sqltools.png)
+- The pgAdmin web interface, a PostgreSQL DB browser / management UI, is available at [http://localhost:8000/pgadmin/](http://localhost:8000/pgadmin/).
 
 - Under the **Task Explorer** tab, a list of available preconfigured tasks is displayed. *(You may need to expand the tree to `src > vscode` to see it.)* These are common scritps you can run *(e.g. run tests, fetch assets, etc.)*.
 
@@ -103,7 +99,7 @@ You can also open the datatracker project folder and click the **Reopen in conta
 2. Wait for the containers to initialize. Upon completion, you will be dropped into a shell from which you can start the datatracker and execute related commands as usual, for example
 
     ```
-    ietf/manage.py runserver 0.0.0.0:8000
+    ietf/manage.py runserver 8001
     ```
 
     to start the datatracker.
@@ -160,12 +156,17 @@ On Windows:
 docker compose down -v --rmi all
 docker image prune
 ```
+### Updating an older environment
 
-### Accessing MariaDB Port
+If you already have a clone, such as from a previous codesprint, and are updating that clone, before starting the datatracker from the updated image:
+* rm ietf/settings_local.py   # The startup script will put a new one, appropriate to the current release, in place
+* Execute the `Clean all` sequence above.
 
-The port is exposed but not mapped to `3306` to avoid potential conflicts with the host. To get the mapped port, run the command *(from the project `/docker` directory)*:
+### Accessing PostgreSQL Port
+
+The port is exposed but not automatically mapped to `5432` to avoid potential conflicts with the host. To get the mapped port, run the command *(from the project `/docker` directory)*:
 ```sh
-docker compose port db 3306
+docker compose port db 5432
 ```
 
 ## Notes / Troubleshooting
@@ -187,3 +188,18 @@ The content of the source files will be copied into the target `.ics` files. Mak
 ### Missing assets in the data folder
 
 Because including all assets in the image would significantly increase the file size, they are not included by default. You can however fetch them by running the **Fetch assets via rsync** task in VS Code or run manually the script `docker/scripts/app-rsync-extras.sh`
+
+
+### Linux file permissions leaking to the host system
+
+If on the host filesystem you have permissions that look like this,
+
+```bash
+$ ls -la
+total 4624
+drwxrwxr-x   2  100999  100999    4096 May 25 07:56 bin
+drwxrwxr-x   5  100999  100999    4096 May 25 07:56 client
+(etc...)
+```
+
+Try uninstalling Docker Desktop and installing Docker Compose manually. The Docker Compose bundled with Docker Desktop is incompatible with our software. See also [Rootless Docker: file ownership changes #3343](https://github.com/lando/lando/issues/3343), [Docker context desktop-linux has container permission issues #75](https://github.com/docker/desktop-linux/issues/75).

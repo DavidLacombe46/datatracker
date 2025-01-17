@@ -3,9 +3,6 @@
 {% load origin static %}
 {% load nomcom_tags %}
 {% block subtitle %}- View feedback{% endblock %}
-{% block pagehead %}
-    <link rel="stylesheet" href="{% static "ietf/css/list.css" %}">
-{% endblock %}
 {% block nomcom_content %}
     {% origin %}
     <h2 class="mt-3">Feedback related to nominees</h2>
@@ -47,7 +44,7 @@
                         </td>
                         {% for fbtype_name, fbtype_count, fbtype_newflag in fb_dict.feedback %}
                             <td>
-                                {% if fbtype_newflag %}<span class="badge rounded-pill bg-success">New</span>{% endif %}
+                                {% if fbtype_newflag %}<span class="badge rounded-pill text-bg-success">New</span>{% endif %}
                                 {{ fbtype_count }}
                             </td>
                         {% endfor %}
@@ -86,7 +83,7 @@
                     </td>
                     {% for fbtype_name, fbtype_count, fbtype_newflag in fb_dict.feedback %}
                         <td>
-                            {% if fbtype_newflag %}<span class="badge rounded-pill bg-success">New</span>{% endif %}
+                            {% if fbtype_newflag %}<span class="badge rounded-pill text-bg-success">New</span>{% endif %}
                             {{ fbtype_count }}
                         </td>
                     {% endfor %}
@@ -113,7 +110,4 @@
             </tbody>
         </table>
     {% endif %}
-{% endblock %}
-{% block js %}
-    <script src="{% static "ietf/js/list.js" %}"></script>
 {% endblock %}

@@ -42,8 +42,8 @@ class DocRelationshipName(NameModel):
 
 class DocTypeName(NameModel):
     """Draft, Agenda, Minutes, Charter, Discuss, Guideline, Email,
-    Review, Issue, Wiki"""
-    prefix =  models.CharField(max_length=16, default="")
+    Review, Issue, Wiki, RFC"""
+    prefix =  models.CharField(max_length=32, default="")
 class DocTagName(NameModel):
     """Waiting for Reference, IANA Coordination, Revised ID Needed,
     External Party, AD Followup, Point Raised - Writeup Needed, ..."""
@@ -94,13 +94,14 @@ class NomineePositionStateName(NameModel):
     """Status of a candidate for a position: None, Accepted, Declined"""
 class FeedbackTypeName(NameModel):
     """Type of feedback: questionnaires, nominations, comments"""
+    legend = models.CharField(max_length=1, default="", help_text="One-character legend for feedback classification form")
 class DBTemplateTypeName(NameModel):
     """reStructuredText, Plain, Django"""
 class DraftSubmissionStateName(NameModel):
     """Uploaded, Awaiting Submitter Authentication, Awaiting Approval from
     Previous Version Authors, Awaiting Initial Version Approval, Awaiting
     Manual Post, Cancelled, Posted"""
-    next_states = models.ManyToManyField('DraftSubmissionStateName', related_name="previous_states", blank=True)
+    next_states = models.ManyToManyField('name.DraftSubmissionStateName', related_name="previous_states", blank=True)
 class RoomResourceName(NameModel):
     "Room resources: Audio Stream, Meetecho, . . ."
 class IprDisclosureStateName(NameModel):
@@ -149,4 +150,7 @@ class ExtResourceName(NameModel):
 class SlideSubmissionStatusName(NameModel):
     "Pending, Accepted, Rejected"
 class TelechatAgendaSectionName(NameModel):
-    "roll_call", "minutes", "action_items"
+    """roll_call, minutes, action_items"""
+
+class AppealArtifactTypeName(NameModel):
+    pass

@@ -1,2 +1,6 @@
-@import "vanillajs-datepicker/sass/index-bs5";
+@import "custom-bs-import";
+
+// FIXME: color.scale doesn't seem to work with CSS variables, so avoid those:`
+$dp-cell-focus-background-color: $dropdown-link-hover-bg !default;
+
 @import "vanillajs-datepicker/sass/datepicker-bs5";

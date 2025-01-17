@@ -1,6 +1,4 @@
-// Import bootstrap helpers
-@import "bootstrap/scss/functions";
-@import "bootstrap/scss/variables";
+@import "custom-bs-import";
 
 table .sort {
     cursor: pointer;

@@ -27,10 +27,10 @@
                 </th>
                 <td class="edit"></td>
                 <td>
-                    <a href="{% url "ietf.doc.views_doc.document_main" name=conflictdoc.canonical_name %}">
-                        {% if conflictdoc.get_state_slug == 'rfc' %}{{ conflictdoc.canonical_name|prettystdname }}{% else %}{{ conflictdoc.canonical_name }}-{{ conflictdoc.rev }}{% endif %}</a>
-                    <span class="badge rounded-pill bg-info">{{ conflictdoc.stream }} stream</span>
-                    {% if snapshot %}<span class="badge rounded-pill bg-warning">Snapshot</span>{% endif %}
+                    <a href="{% url "ietf.doc.views_doc.document_main" name=conflictdoc.name %}">
+                        {% if conflictdoc.type_id == 'rfc' %}{{ conflictdoc.name|prettystdname }}{% else %}{{ conflictdoc.name }}-{{ conflictdoc.rev }}{% endif %}</a>
+                    <span class="badge rounded-pill text-bg-info">{{ conflictdoc.stream }} stream</span>
+                    {% if snapshot %}<span class="badge rounded-pill text-bg-warning">Snapshot</span>{% endif %}
                 </td>
             </tr>
             <tr>
@@ -54,11 +54,7 @@
                     {% endif %}
                 </td>
                 <td>
-                    {% if "no-problem" in doc.get_state.name|slugify %}
-                        <span class="text-success">{{ doc.get_state.name}}</span>
-                    {% else %}
-                        {{ doc.get_state.name }}
-                    {% endif %}
+                    {{ doc.get_state.name|badgeify }}
                 </td>
             </tr>
         </tbody>
