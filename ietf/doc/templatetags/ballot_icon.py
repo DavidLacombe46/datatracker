@@ -96,9 +96,14 @@ def ballot_icon(context, doc):
     positions = list(ballot.active_balloter_positions().items())
     positions.sort(key=sort_key)
 
+    request = context.get("request")
+    ballot_edit_return_point_param = f"ballot_edit_return_point={request.path}"
+
     right_click_string = ''
     if has_role(user, "Area Director"):
-        right_click_string = 'oncontextmenu="window.location.href=\'%s\';return false;"' %  urlreverse('ietf.doc.views_ballot.edit_position', kwargs=dict(name=doc.name, ballot_id=ballot.pk))
+        right_click_string = 'oncontextmenu="window.location.href=\'{}?{}\';return false;"'.format(
+            urlreverse('ietf.doc.views_ballot.edit_position', kwargs=dict(name=doc.name, ballot_id=ballot.pk)),
+            ballot_edit_return_point_param)
 
     my_blocking = False
     for i, (balloter, pos) in enumerate(positions):
@@ -113,10 +118,14 @@ def ballot_icon(context, doc):
         typename = "RSAB"
     else:
         typename = "IESG"
+    
+    modal_url = "{}?{}".format(
+        urlreverse("ietf.doc.views_doc.ballot_popup", kwargs=dict(name=doc.name, ballot_id=ballot.pk)),
+        ballot_edit_return_point_param)
 
     res = ['<a %s href="%s" data-bs-toggle="modal" data-bs-target="#modal-%d" aria-label="%s positions" title="%s positions (click to show more)" class="ballot-icon"><table' % (
             right_click_string,
-            urlreverse("ietf.doc.views_doc.ballot_popup", kwargs=dict(name=doc.name, ballot_id=ballot.pk)),
+            modal_url,
             ballot.pk,
             typename,
             typename,)]
@@ -175,7 +184,7 @@ def state_age_colored(doc):
         if not iesg_state:
             return ""
 
-        if iesg_state in ["dead", "watching", "pub", "idexists"]:
+        if iesg_state in ["dead", "pub", "idexists"]:
             return ""
         try:
             state_datetime = (
@@ -212,9 +221,9 @@ def state_age_colored(doc):
             goal1 = 14
             goal2 = 28
         if days > goal2:
-            class_name = "bg-danger"
+            class_name = "text-bg-danger"
         elif days > goal1:
-            class_name = "bg-warning"
+            class_name = "text-bg-warning"
         else:
             # don't show a badge when things are in the green; clutters display
             # class_name = "text-success"
@@ -247,6 +256,6 @@ def auth48_alert_badge(doc):
 
     rfced_state = doc.get_state_slug('draft-rfceditor')
     if rfced_state == 'auth48':
-        return mark_safe('<span class="badge rounded-pill bg-info" title="AUTH48">AUTH48</span>')
+        return mark_safe('<span class="badge rounded-pill text-bg-info" title="AUTH48">AUTH48</span>')
 
     return ''

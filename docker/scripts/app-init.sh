@@ -2,6 +2,12 @@
 
 WORKSPACEDIR="/workspace"
 
+# Handle Linux host mounting the workspace dir as root
+if [ ! -O "${WORKSPACEDIR}/ietf" ]; then
+    sudo chown -R dev:dev $WORKSPACEDIR
+fi
+
+# Start rsyslog service
 sudo service rsyslog start &>/dev/null
 
 # Add /workspace as a safe git directory
@@ -17,9 +23,6 @@ sudo chown -R dev:dev "$WORKSPACEDIR/__pycache__"
 sudo chown -R dev:dev "$WORKSPACEDIR/.vite"
 sudo chown -R dev:dev "$WORKSPACEDIR/.yarn/unplugged"
 sudo chown dev:dev "/assets"
-
-echo "Fix chromedriver /dev/shm permissions..."
-sudo chmod 1777 /dev/shm
 
 # Run nginx
 echo "Starting nginx..."
@@ -106,11 +109,11 @@ if [ -z "$EDITOR_VSCODE" ]; then
         echo
         echo "You can execute arbitrary commands now, e.g.,"
         echo
-        echo "    ietf/manage.py runserver 0.0.0.0:8001"
+        echo "    ietf/manage.py runserver 8001"
         echo
         echo "to start a development instance of the Datatracker."
         echo
-        echo "    ietf/manage.py test --settings=settings_postgrestest"
+        echo "    ietf/manage.py test --settings=settings_test"
         echo
         echo "to run all the python tests."
         echo

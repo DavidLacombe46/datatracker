@@ -1,4 +1,4 @@
-# Copyright The IETF Trust 2016-2020, All Rights Reserved
+# Copyright The IETF Trust 2016-2023, All Rights Reserved
 # -*- coding: utf-8 -*-
 
 
@@ -41,7 +41,7 @@ class ReviewTests(TestCase):
             r = self.client.get(url)
             self.assertEqual(r.status_code, 200)
             self.assertContains(r, review_req.doc.name)
-            self.assertContains(r, assignment.reviewer.person.name)
+            self.assertContains(r, escape(assignment.reviewer.person.name))
 
         url = urlreverse(ietf.group.views.review_requests, kwargs={ 'acronym': group.acronym })
 
@@ -101,8 +101,20 @@ class ReviewTests(TestCase):
 
         self.assertEqual(list(suggested_review_requests_for_team(team)), [])
 
+        # blocked by an already existing request (don't suggest it again)
+        review_req.state_id = "requested"
+        review_req.save()
+        self.assertEqual(list(suggested_review_requests_for_team(team)), [])
+
+        # ... but not for a previous version
+        review_req.requested_rev = prev_rev
+        review_req.save()
+        self.assertEqual(len(suggested_review_requests_for_team(team)), 1)
+
+
         # blocked by completion
         review_req.state = ReviewRequestStateName.objects.get(slug="assigned")
+        review_req.requested_rev = ""
         review_req.save()
         assignment.state = ReviewAssignmentStateName.objects.get(slug="completed")
         assignment.reviewed_rev = review_req.doc.rev
@@ -115,6 +127,7 @@ class ReviewTests(TestCase):
         assignment.save()
 
         self.assertEqual(len(suggested_review_requests_for_team(team)), 1)
+
 
     def test_suggested_review_requests_on_lc_and_telechat(self):
         review_req = ReviewRequestFactory(state_id='assigned')
@@ -183,7 +196,7 @@ class ReviewTests(TestCase):
                     urlreverse(ietf.group.views.reviewer_overview, kwargs={ 'acronym': group.acronym, 'group_type': group.type_id })]:
             r = self.client.get(url)
             self.assertEqual(r.status_code, 200)
-            self.assertContains(r, reviewer.name)
+            self.assertContains(r, escape(reviewer.name))
             self.assertContains(r, review_req1.doc.name)
             # without a login, reason for being unavailable should not be seen
             self.assertNotContains(r, "Availability")
@@ -199,13 +212,13 @@ class ReviewTests(TestCase):
         r = self.client.get(url)
         self.assertEqual(r.status_code, 200)
         # review team members can see reason for being unavailable
-        self.assertContains(r, "Availability")
+        self.assertContains(r, "Available")
 
         self.client.login(username="secretary", password="secretary+password")
         r = self.client.get(url)
         self.assertEqual(r.status_code, 200)
         # secretariat can see reason for being unavailable
-        self.assertContains(r, "Availability")
+        self.assertContains(r, "Available")
 
         # add one closed review with no response and see it is visible
         review_req2 = ReviewRequestFactory(state_id='completed',team=team)
@@ -223,7 +236,7 @@ class ReviewTests(TestCase):
         r = self.client.get(url)
         self.assertEqual(r.status_code, 200)
         # We should see the new document with status of no response
-        self.assertContains(r, "No Response")
+        self.assertContains(r, "No response")
         self.assertContains(r, review_req1.doc.name)
         self.assertContains(r, review_req2.doc.name)
         # None of the reviews should be completed this time,
@@ -697,6 +710,22 @@ class ReviewTests(TestCase):
         self.assertEqual(settings.remind_days_before_deadline, 6)
         self.assertEqual(settings.max_items_to_show_in_reviewer_list, 10)
         self.assertEqual(settings.days_to_show_in_reviewer_list, 365)
+
+    def test_assign_reviewer_after_reject(self):
+        team = ReviewTeamFactory()
+        reviewer = RoleFactory(name_id='reviewer', group=team).person
+        ReviewerSettingsFactory(person=reviewer, team=team)
+        review_req = ReviewRequestFactory(team=team)
+        ReviewAssignmentFactory(review_request=review_req, state_id='rejected', reviewer=reviewer.email())
+
+        unassigned_url = urlreverse(ietf.group.views.manage_review_requests, kwargs={ 'acronym': team.acronym, 'group_type': team.type_id, "assignment_status": "unassigned" })
+        login_testing_unauthorized(self, "secretary", unassigned_url)
+
+        r = self.client.get(unassigned_url)
+        self.assertEqual(r.status_code, 200)
+        q = PyQuery(r.content)
+        reviewer_label = q("option[value=\"{}\"]".format(reviewer.email())).text().lower()
+        self.assertIn("rejected review of document before", reviewer_label)
 
 
 class BulkAssignmentTests(TestCase):

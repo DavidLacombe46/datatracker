@@ -1,7 +1,8 @@
 # Copyright The IETF Trust 2014-2021, All Rights Reserved
 # -*- coding: utf-8 -*-
 
-from django.conf import settings
+import os
+
 from django.urls import reverse as urlreverse
 from unittest import skipIf
 
@@ -9,10 +10,11 @@ skip_selenium = False
 skip_message  = ""
 try:
     from selenium import webdriver
-    from selenium.webdriver.chrome.service import Service
-    from selenium.webdriver.chrome.options import Options
+    from selenium.webdriver.firefox.service import Service
+    from selenium.webdriver.firefox.options import Options
+    from selenium.webdriver.support.ui import WebDriverWait
+    from selenium.webdriver.support import expected_conditions
     from selenium.webdriver.common.by import By
-    from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 except ImportError as e:
     skip_selenium = True
     skip_message = "Skipping selenium tests: %s" % e
@@ -21,7 +23,7 @@ except ImportError as e:
 from ietf.utils.pipe import pipe
 from ietf.utils.test_runner import IetfLiveServerTestCase
 
-executable_name = 'chromedriver'
+executable_name = 'geckodriver'
 code, out, err = pipe('{} --version'.format(executable_name))
 if code != 0:
     skip_selenium = True
@@ -30,20 +32,11 @@ if skip_selenium:
     print("     "+skip_message)
 
 def start_web_driver():
-    service = Service(executable_path="chromedriver",
-                      log_path=settings.TEST_GHOSTDRIVER_LOG_PATH)
-    service.start()
+    service = Service(executable_path=f"/usr/bin/{executable_name}", log_output=f"{executable_name}.log", service_args=['--log-no-truncate'])
     options = Options()
-    options.add_argument("headless")
-    options.add_argument("disable-extensions")
-    options.add_argument("disable-gpu") # headless needs this
-    options.add_argument("no-sandbox") # docker needs this
-    dc = DesiredCapabilities.CHROME
-    dc["goog:loggingPrefs"] = {"browser": "ALL"}
-    # For selenium 3:
-    return webdriver.Chrome("chromedriver", options=options, desired_capabilities=dc)
-    # For selenium 4:
-    # return webdriver.Chrome(service=service, options=options, desired_capabilities=dc)
+    options.add_argument("--headless")
+    os.environ["MOZ_REMOTE_SETTINGS_DEVTOOLS"] = "1"
+    return webdriver.Firefox(service=service, options=options)
 
 
 def selenium_enabled():
@@ -96,6 +89,48 @@ class IetfSeleniumTestCase(IetfLiveServerTestCase):
         # actions = ActionChains(self.driver)
         # actions.move_to_element(element).perform()
 
+    def scroll_and_click(self, element_locator, timeout_seconds=5):
+        """
+        Selenium has restrictions around clicking elements outside the viewport, so
+        this wrapper encapsulates the boilerplate of forcing scrolling and clicking.
+
+        :param element_locator: A two item tuple of a Selenium locator eg `(By.CSS_SELECTOR, '#something')`
+        """
+
+        # so that we can restore the state of the webpage after clicking
+        original_html_scroll_behaviour_to_restore = self.driver.execute_script('return document.documentElement.style.scrollBehavior')
+        original_html_overflow_to_restore = self.driver.execute_script('return document.documentElement.style.overflow')
+
+        original_body_scroll_behaviour_to_restore = self.driver.execute_script('return document.body.style.scrollBehavior')
+        original_body_overflow_to_restore = self.driver.execute_script('return document.body.style.overflow')
+
+        self.driver.execute_script('document.documentElement.style.scrollBehavior = "auto"')
+        self.driver.execute_script('document.documentElement.style.overflow = "auto"')
+
+        self.driver.execute_script('document.body.style.scrollBehavior = "auto"')
+        self.driver.execute_script('document.body.style.overflow = "auto"')
+
+        element = self.driver.find_element(element_locator[0], element_locator[1])
+        self.scroll_to_element(element)
+
+        # Note that Selenium itself seems to have multiple definitions of 'clickable'.
+        # You might expect that the following wait for the 'element_to_be_clickable'
+        # would confirm that the following .click() would succeed but it doesn't.
+        # That's why the preceeding code attempts to force scrolling to bring the
+        # element into the viewport to allow clicking.
+        WebDriverWait(self.driver, timeout_seconds).until(expected_conditions.element_to_be_clickable(element_locator))
+
+        element.click()
+
+        if original_html_scroll_behaviour_to_restore:
+            self.driver.execute_script(f'document.documentElement.style.scrollBehavior = "{original_html_scroll_behaviour_to_restore}"')
+        if original_html_overflow_to_restore:
+            self.driver.execute_script(f'document.documentElement.style.overflow = "{original_html_overflow_to_restore}"')
+
+        if original_body_scroll_behaviour_to_restore:
+            self.driver.execute_script(f'document.body.style.scrollBehavior = "{original_body_scroll_behaviour_to_restore}"')
+        if original_body_overflow_to_restore:
+            self.driver.execute_script(f'document.body.style.overflow = "{original_body_overflow_to_restore}"')
 
 class presence_of_element_child_by_css_selector:
     """Wait for presence of a child of a WebElement matching a CSS selector

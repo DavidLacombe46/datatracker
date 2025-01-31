@@ -39,6 +39,10 @@
     backdrop-filter: blur(10px);
 }
 
+.theme-dark #app-loading {
+    background-color: rgba(0,0,0,.75);
+}
+
 #app-loading:before {
     content: '';
     box-sizing: border-box;
@@ -56,6 +60,10 @@
     z-index: 2000000000;
 }
 
+.theme-dark #app-loading:before {
+    border-top-color: #FFF;
+}
+
 #app-loading:after {
     content: 'Loading meeting {{ meetingData.meetingNumber }}...';
     position: absolute;
@@ -69,6 +77,10 @@
     z-index: 2000000000;
 }
 
+.theme-dark #app-loading:after {
+    color: #FFF;
+}
+
 #app-loading-footer {
     position: absolute;
     text-align: center;
@@ -77,13 +89,19 @@
     right: 0;
     z-index: 1000000000;
 }
+
+.theme-dark #app-loading-footer .btn-light {
+    background-color: rgba(255,255,255,.1) !important;
+    border-color: rgba(255,255,255,.05) !important;
+    color: #FFF !important;
+}
 {% endblock %}
 {% block content %}
     {% origin %}
     <div id="app"></div>
     <div id="app-loading">
         <div id="app-loading-footer">
-            <a class="btn btn-light text-body-secondary mb-3" href="/meeting/{{ meetingData.meetingNumber }}/agenda.txt"><small>Switch to text-only version &#11166;</small></a>
+            <a class="btn btn-light text-body-secondary mb-3" href="/meeting/{{ meetingData.meetingNumber }}/agenda.txt"><small>Switch to text-only version &raquo;</small></a>
         </div>
     </div>
 {% endblock %}

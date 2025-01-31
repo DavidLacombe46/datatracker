@@ -1,37 +1,9 @@
 @use "sass:map";
 
-@import "bootstrap/scss/functions";
-
-// Enable negative margin classes.
-$enable-negative-margins: true;
-
-// Don't add carets to dropdowns by default.
-// $enable-caret: false;
-
-$popover-max-width: 100%;
-
-// Override default fonts
-
-$font-family-sans-serif: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", "Liberation Sans", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
-$font-family-monospace: "Noto Sans Mono", SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-
-// Only import what we need:
-
-@import "bootstrap/scss/variables";
-
-$h1-font-size: $font-size-base * 2.2;
-$h2-font-size: $font-size-base * 1.8;
-$h3-font-size: $font-size-base * 1.6;
-$h4-font-size: $font-size-base * 1.4;
-$h5-font-size: $font-size-base * 1.2;
-$h6-font-size: $font-size-base;
-
-@import "bootstrap/scss/maps";
-@import "bootstrap/scss/mixins";
-@import "bootstrap/scss/utilities";
-@import "bootstrap/scss/root";
+@import "custom-bs-import";
 
 // Layout & components
+// Only import what we need:
 @import "bootstrap/scss/reboot";
 @import "bootstrap/scss/type";
 @import "bootstrap/scss/images";
@@ -75,13 +47,62 @@ url("npm:bootstrap-icons/font/fonts/bootstrap-icons.woff") format("woff");
 @import "bootstrap-icons/font/bootstrap-icons";
 
 // Leave room for fixed-top navbar...
-body {
+body.navbar-offset {
     padding-top: 60px;
 }
 
 // ...and make sure it doesn't overlap when we scroll to anchors.
 html {
     scroll-padding-top: 60px;
+}
+
+// Toggle classes for dark/light modes
+[data-bs-theme="dark"] {
+    .d-dm-none {
+        display: none;
+    }
+
+    .d-lm-none {
+        display: initial;
+    }
+}
+
+[data-bs-theme="light"] {
+    .d-dm-none {
+        display: initial;
+    }
+
+    .d-lm-none {
+        display: none;
+    }
+}
+
+// Make submenus open on hover.
+@include media-breakpoint-up(lg) {
+    .dropdown-menu>li>ul {
+        display: none;
+    }
+
+    .dropdown-menu>li:hover>ul {
+        display: block;
+    }
+
+}
+
+@include media-breakpoint-up(md) {
+    .leftmenu .nav>li>ul {
+        display: none;
+    }
+
+    .leftmenu .nav>li:hover>ul {
+        display: block;
+    }
+}
+
+:is(.dropdown-menu, .leftmenu .nav) .dropdown-menu {
+    top: 0;
+    left: 100%;
+    right: auto;
 }
 
 // Make textareas in forms use a monospace font
@@ -132,8 +153,8 @@ pre {
         --#{$prefix}dropdown-divider-bg: #{$dropdown-divider-bg};
         --#{$prefix}dropdown-divider-margin-y: #{$dropdown-divider-margin-y};
         --#{$prefix}dropdown-box-shadow: #{$dropdown-box-shadow};
-        --#{$prefix}dropdown-link-color: #{$dropdown-link-color};
-        --#{$prefix}dropdown-link-hover-color: #{$dropdown-link-hover-color};
+        --#{$prefix}dropdown-link-color: #{$nav-link-color};
+        --#{$prefix}dropdown-link-hover-color: #{$nav-link-hover-color};
         --#{$prefix}dropdown-link-hover-bg: #{$dropdown-link-hover-bg};
         --#{$prefix}dropdown-link-active-color: #{$dropdown-link-active-color};
         --#{$prefix}dropdown-link-active-bg: #{$dropdown-link-active-bg};
@@ -215,8 +236,12 @@ th,
 
 // Helper to constrain the size of the main logo
 .ietflogo {
-    width: 75%;
+    width: 100%;
     max-width: 300px;
+}
+.ietflogo > img {
+    min-width: 100px;
+    width: 100%;
 }
 
 // Make revision numbers pagination items fixed-width
@@ -278,7 +303,7 @@ th,
     .axis path,
     .axis line {
         fill: none;
-        stroke: black;
+        stroke: var(--bs-body-color);
     }
 
     .axis.y path,
@@ -295,7 +320,7 @@ th,
     }
 
     .bar text {
-        fill: black;
+        fill: var(--bs-body-color);
         dominant-baseline: central;
         pointer-events: none;
     }
@@ -334,7 +359,7 @@ th,
 }
 
 .ballot-icon table .my {
-    border: 2 * $table-border-width solid #000;
+    border: calc(2 * $table-border-width) solid var(--bs-emphasis-color);
 }
 
 // See https://getbootstrap.com/docs/5.1/customize/color/#all-colors
@@ -446,36 +471,64 @@ td.position-recuse {
 }
 
 td.position-norecord {
-    background-color: $white; // $color-norecord;
+    background-color: transparent;
 }
 
 td.position-empty {
     border: none !important;
 }
 
-tr.position-moretime-row,
-tr.position-notready-row,
-tr.position-discuss-row,
-tr.position-block-row {
-    background-color: tint-color($color-discuss, 85%);
+[data-bs-theme="light"] {
+
+    tr.position-moretime-row,
+    tr.position-notready-row,
+    tr.position-discuss-row,
+    tr.position-block-row {
+        background-color: tint-color($color-discuss, 85%);
+    }
+
+    tr.position-yes-row {
+        background-color: tint-color($color-yes, 75%);
+    }
+
+    tr.position-noobj-row {
+        background-color: tint-color($color-noobj, 50%);
+    }
+
+    tr.position-abstain-row {
+        background-color: tint-color($color-abstain, 85%);
+    }
+
+    tr.position-recuse-row {
+        background-color: tint-color($color-recuse, 85%);
+    }
 }
 
-tr.position-yes-row {
-    background-color: tint-color($color-yes, 75%);
-}
+[data-bs-theme="dark"] {
 
-tr.position-noobj-row {
-    background-color: tint-color($color-noobj, 50%);
-}
+    tr.position-moretime-row,
+    tr.position-notready-row,
+    tr.position-discuss-row,
+    tr.position-block-row {
+        background-color: shade-color($color-discuss, 85%);
+    }
 
-tr.position-abstain-row {
-    background-color: tint-color($color-abstain, 85%);
-}
+    tr.position-yes-row {
+        background-color: shade-color($color-yes, 75%);
+    }
 
-tr.position-recuse-row {
-    background-color: tint-color($color-recuse, 85%);
-}
+    tr.position-noobj-row {
+        background-color: shade-color($color-noobj, 75%);
+    }
 
+    tr.position-abstain-row {
+        background-color: shade-color($color-abstain, 85%);
+    }
+
+    tr.position-recuse-row {
+        background-color: shade-color($color-recuse, 85%);
+    }
+}
 
 /* === Edit Meeting Schedule ====================================== */
 
@@ -513,7 +566,7 @@ tr.position-recuse-row {
 }
 
 .edit-meeting-schedule .edit-grid .day-label .swap-days:hover {
-    color: #666;
+    color: var(--bs-secondary-color);
 }
 
 .edit-meeting-schedule #swap-days-modal .modal-body label {
@@ -545,15 +598,15 @@ tr.position-recuse-row {
 }
 
 .edit-meeting-schedule .edit-grid .time-header .time-label.would-violate-hint {
-    background-color: #ffe0e0;
-    outline: #ffe0e0 solid 0.4em;
+    background-color: var(--bs-danger-bg-subtle);
+    outline: var(--bs-danger-bg-subtle) solid 0.4em;
 }
 
 .edit-meeting-schedule .edit-grid .time-header .time-label span {
     display: inline-block;
     width: 100%;
     text-align: center;
-    color: #444444;
+    color: var(--bs-secondary-color);
 }
 
 .edit-meeting-schedule .edit-grid .timeslots {
@@ -565,7 +618,7 @@ tr.position-recuse-row {
 .edit-meeting-schedule .edit-grid .timeslot {
     position: relative;
     display: inline-block;
-    background-color: #f4f4f4;
+    background-color: var(--bs-secondary-bg);
     height: 100%;
     overflow: hidden;
 }
@@ -578,7 +631,7 @@ tr.position-recuse-row {
     width: 100%;
     align-items: center;
     justify-content: center;
-    color: #999;
+    color: var(--bs-tertiary-color);
 }
 
 .edit-meeting-schedule .edit-grid .timeslot .drop-target {
@@ -595,22 +648,22 @@ tr.position-recuse-row {
 }
 
 .edit-meeting-schedule .edit-grid .timeslot.overfull {
-    border-right: 0.3em dashed #f55000;
+    border-right: 0.3em dashed var(--bs-danger);
     /* cut-off illusion */
 }
 
 .edit-meeting-schedule .edit-grid .timeslot.would-violate-hint {
-    background-color: #ffe0e0;
-    outline: #ffe0e0 solid 0.4em;
+    background-color: var(--bs-danger-bg-subtle);
+    outline: var(--bs-danger-bg-subtle) solid 0.4em;
 }
 
 .edit-meeting-schedule .edit-grid .timeslot.would-violate-hint.dropping {
-    background-color: #ccb3b3;
+    background-color: var(--bs-danger);
 }
 
 .edit-meeting-schedule .constraints .encircled,
 .edit-meeting-schedule .formatted-constraints .encircled {
-    border: 1px solid #000;
+    border: 1px solid var( --bs-body-color);
     border-radius: 1em;
     padding: 0 0.3em;
     text-align: center;
@@ -623,7 +676,7 @@ tr.position-recuse-row {
 
 /* sessions */
 .edit-meeting-schedule .session {
-    background-color: #fff;
+    background-color: var(--bs-body-bg);
     margin: 0.2em;
     padding-right: 0.2em;
     padding-left: 0.5em;
@@ -635,15 +688,15 @@ tr.position-recuse-row {
 
 .edit-meeting-schedule .session.selected {
     cursor: grabbing;
-    outline: #0000ff solid 0.2em;
-    /* blue, width matches margin on .session */
+    outline: var(--bs-primary) solid 0.2em;
+    /* width matches margin on .session */
     z-index: 2;
     /* render above timeslot outlines */
 }
 
 .edit-meeting-schedule .session.other-session-selected {
-    outline: #00008b solid 0.2em;
-    /* darkblue, width matches margin on .session */
+    outline: var(--bs-info) solid 0.2em;
+    /* width matches margin on .session */
     z-index: 2;
     /* render above timeslot outlines */
 }
@@ -654,7 +707,7 @@ tr.position-recuse-row {
 
 .edit-meeting-schedule .session.readonly {
     cursor: default;
-    background-color: #ddd;
+    background-color: var(--bs-dark-bg-subtle);
 }
 
 .edit-meeting-schedule .session.hidden-parent * {
@@ -668,13 +721,12 @@ tr.position-recuse-row {
 }
 
 .edit-meeting-schedule .session.highlight {
-    outline-color: #ff8c00;
-    /* darkorange */
-    background-color: #f3f3f3;
+    outline-color: var(--bs-warning);
+    background-color: var(--bs-light);
 }
 
 .edit-meeting-schedule .session.would-violate-hint {
-    outline: 0.3em solid #F55000;
+    outline: 0.3em solid var(--bs-danger);
     z-index: 1;
     /* raise up so the outline is not overdrawn */
 }
@@ -696,6 +748,7 @@ tr.position-recuse-row {
 
 .edit-meeting-schedule .edit-grid,
 .edit-meeting-schedule .session {
+    // Removing this font-family style causes selenium tests to fail :-(
     font-family: arial, helvetica, sans-serif;
     font-size: 11px;
 }
@@ -767,9 +820,9 @@ tr.position-recuse-row {
     bottom: 0;
     left: 0;
     width: 100%;
-    border-top: 0.2em solid #ccc;
+    border-top: 0.2em solid var(--bs-border-color);
     margin-bottom: 2em;
-    background-color: #fff;
+    background-color: var(--bs-body-bg);
     opacity: 0.95;
     z-index: 5;
     /* raise above edit-grid items */
@@ -784,7 +837,7 @@ tr.position-recuse-row {
     min-height: 4em;
     max-height: 13em;
     overflow-y: auto;
-    background-color: #f4f4f4;
+    background-color: var(--bs-secondary-bg);
 }
 
 .edit-meeting-schedule .unassigned-sessions.dropping {
@@ -841,7 +894,7 @@ tr.position-recuse-row {
     font-weight: normal;
     margin-right: 1em;
     padding: 0 1em;
-    border: 0.1em solid #eee;
+    border: 0.1em solid var(--bs-border-color);
     cursor: pointer;
 }
 
@@ -907,7 +960,7 @@ tr.position-recuse-row {
 }
 
 .edit-meeting-timeslots-and-misc-sessions .room-row {
-    border-bottom: 1px solid #ccc;
+    border-bottom: 1px solid var(--bs-border-color);
     // height: 20px;
     display: flex;
     cursor: pointer;
@@ -927,13 +980,13 @@ tr.position-recuse-row {
 }
 
 .edit-meeting-timeslots-and-misc-sessions .timeline.hover {
-    background: radial-gradient(#999 1px, transparent 1px);
+    background: radial-gradient(var(--bs-tertiary-color) 1px, transparent 1px);
     background-size: 20px 20px;
 }
 
 .edit-meeting-timeslots-and-misc-sessions .timeline.selected.hover,
 .edit-meeting-timeslots-and-misc-sessions .timeline.selected {
-    background: radial-gradient(#999 2px, transparent 2px);
+    background: radial-gradient(var(--bs-tertiary-color) 2px, transparent 2px);
     background-size: 20px 20px;
 }
 
@@ -949,8 +1002,8 @@ tr.position-recuse-row {
     white-space: nowrap;
     cursor: pointer;
     padding-left: 0.2em;
-    border-left: 1px solid #999;
-    border-right: 1px solid #999;
+    border-left: 1px solid var(--bs-border-color);
+    border-right: 1px solid var(--bs-border-color);
 }
 
 .edit-meeting-timeslots-and-misc-sessions .timeslot:hover {
@@ -970,10 +1023,10 @@ tr.position-recuse-row {
     bottom: 0;
     left: 0;
     width: 100%;
-    border-top: 0.2em solid #ccc;
+    border-top: 0.2em solid var(--bs-border-color);
     padding-top: 0.2em;
     margin-bottom: 2em;
-    background-color: #fff;
+    background-color: var(--bs-body-bg);
     opacity: 0.95;
 }
 
@@ -1021,7 +1074,7 @@ tr.position-recuse-row {
 }
 
 .timeslot-edit .tstable div.timeslot {
-    border: #000000 solid 1px;
+    border: var(--bs-body-color) solid 1px;
     border-radius: 0.5em;
     padding: 0.5em;
 }
@@ -1051,7 +1104,7 @@ tr.position-recuse-row {
 }
 
 .timeslot-edit .tstable .tstype_unavail {
-    background-color: #666;
+    background-color: var(--bs-secondary-color);
 }
 
 .timeslot-edit .official-use-warning {
@@ -1133,4 +1186,33 @@ tr.position-recuse-row {
             text-decoration: underline;
         }
     }
+}
+
+blockquote {
+    padding-left: 1rem;
+    border-left: solid 1px var(--bs-body-color);
+}
+
+iframe.status {
+    background-color:transparent;
+    border:none;
+    width:100%;
+    height:3.5em;
+}
+
+.overflow-shadows {
+    transition: box-shadow 0.5s;
+}
+
+.overflow-shadows--both {
+    box-shadow: inset 0px 21px 18px -20px var(--bs-body-color),
+                inset 0px -21px 18px -20px var(--bs-body-color);
+}
+
+.overflow-shadows--top-only {
+    box-shadow: inset 0px 21px 18px -20px var(--bs-body-color);
+}
+
+.overflow-shadows--bottom-only {
+    box-shadow: inset 0px -21px 18px -20px var(--bs-body-color);
 }

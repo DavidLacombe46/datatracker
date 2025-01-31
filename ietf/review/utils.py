@@ -1,4 +1,4 @@
-# Copyright The IETF Trust 2016-2020, All Rights Reserved
+# Copyright The IETF Trust 2016-2023, All Rights Reserved
 # -*- coding: utf-8 -*-
 
 
@@ -50,6 +50,8 @@ def can_request_review_of_doc(user, doc):
     if not user.is_authenticated:
         return False
 
+    # This is in a strange place as it has nothing to do with the user
+    # but this utility is used in too many places to move this quickly.
     if doc.type_id == 'draft' and doc.get_state_slug() != 'active':
         return False
 
@@ -78,6 +80,11 @@ def review_assignments_to_list_for_docs(docs):
     doc_names = [d.name for d in docs]
 
     return extract_revision_ordered_review_assignments_for_documents_and_replaced(assignment_qs, doc_names)
+
+def review_requests_to_list_for_docs(docs):
+    review_requests_qs = ReviewRequest.objects.filter(Q(state_id='requested'))
+    doc_names = [d.name for d in docs]
+    return extract_revision_ordered_review_requests_for_documents_and_replaced(review_requests_qs, doc_names)
 
 def augment_review_requests_with_events(review_reqs):
     req_dict = { r.pk: r for r in review_reqs }
@@ -383,8 +390,12 @@ def assign_review_request_to_reviewer(request, review_req, reviewer, add_skip=Fa
     log.assertion('reviewer is not None')
 
     # cannot reference reviewassignment_set relation until pk exists
-    if review_req.pk is not None and review_req.reviewassignment_set.filter(reviewer=reviewer).exists():
-        return
+    if review_req.pk is not None:
+        reviewassignment_set = review_req.reviewassignment_set.filter(reviewer=reviewer)
+        if (reviewassignment_set.exists() and not
+            (reviewassignment_set.filter(state_id='rejected').exists() or
+             reviewassignment_set.filter(state_id='withdrawn').exists())):
+            return
 
     # Note that assigning a review no longer unassigns other reviews
 
@@ -589,10 +600,12 @@ def suggested_review_requests_for_team(team):
                    and existing.reviewassignment_set.filter(state_id__in=("assigned", "accepted")).exists()
                    and (not existing.requested_rev or existing.requested_rev == request.doc.rev))
         request_closed = existing.state_id not in ('requested','assigned')
+        # Is there a review request for this document already in system
+        requested = existing.state_id in ('requested') and (not existing.requested_rev or existing.requested_rev == request.doc.rev)
         # at least one assignment was completed for the requested version or the current doc version if no specific version was requested:
         some_assignment_completed = existing.reviewassignment_set.filter(reviewed_rev=existing.requested_rev or existing.doc.rev, state_id='completed').exists()
 
-        return any([no_review_document, no_review_rev, pending, request_closed, some_assignment_completed])
+        return any([no_review_document, no_review_rev, pending, request_closed, requested, some_assignment_completed])
 
     res = [r for r in requests.values()
            if not any(blocks(e, r) for e in existing_requests[r.doc_id])]

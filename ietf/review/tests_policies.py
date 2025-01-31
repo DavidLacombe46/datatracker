@@ -1,4 +1,4 @@
-# Copyright The IETF Trust 2016-2021, All Rights Reserved
+# Copyright The IETF Trust 2016-2023, All Rights Reserved
 
 import debug                            # pyflakes:ignore
 import datetime
@@ -115,7 +115,7 @@ class _Wrapper(TestCase):
             return (ReviewerSettings.objects.filter(team=self.team, person=person).first()
                     or ReviewerSettings(team=self.team, person=person))
 
-        def test_return_reviewer_to_rotation_top(self):
+        def test_set_wants_to_be_next(self):
             # Subclass must implement this
             raise NotImplementedError
 
@@ -472,9 +472,6 @@ class _Wrapper(TestCase):
             addresses = list( map( lambda choice: choice[0], field.choices ) )
             
             self.assertNotIn(
-                str(rejected_reviewer.email()), addresses,
-                "Reviews should not suggest people who have rejected this request in the past")
-            self.assertNotIn(
                 str(no_response_reviewer.email()), addresses,
                 "Reviews should not suggest people who have not responded to this request in the past.")
             
@@ -507,11 +504,9 @@ class RotateAlphabeticallyReviewerQueuePolicyTest(_Wrapper.ReviewerQueuePolicyTe
         rotation = self.policy.default_reviewer_rotation_list()
         self.assertEqual(rotation, available_reviewers[2:] + available_reviewers[:1])
 
-    def test_return_reviewer_to_rotation_top(self):
+    def test_set_wants_to_be_next(self):
         reviewer = self.append_reviewer()
-        self.policy.return_reviewer_to_rotation_top(reviewer, False)
-        self.assertFalse(self.reviewer_settings_for(reviewer).request_assignment_next)
-        self.policy.return_reviewer_to_rotation_top(reviewer, True)
+        self.policy.set_wants_to_be_next(reviewer)
         self.assertTrue(self.reviewer_settings_for(reviewer).request_assignment_next)
 
     def test_update_policy_state_for_assignment(self):
@@ -725,11 +720,9 @@ class LeastRecentlyUsedReviewerQueuePolicyTest(_Wrapper.ReviewerQueuePolicyTestC
         self.assertEqual(self.policy.default_reviewer_rotation_list(),
                          available_reviewers[2:] + [first_reviewer, second_reviewer])
 
-    def test_return_reviewer_to_rotation_top(self):
+    def test_set_wants_to_be_next(self):
         reviewer = self.append_reviewer()
-        self.policy.return_reviewer_to_rotation_top(reviewer, False)
-        self.assertFalse(self.reviewer_settings_for(reviewer).request_assignment_next)
-        self.policy.return_reviewer_to_rotation_top(reviewer, True)
+        self.policy.set_wants_to_be_next(reviewer)
         self.assertTrue(self.reviewer_settings_for(reviewer).request_assignment_next)
 
     def test_assign_reviewer_updates_skip_next_without_add_skip(self):

@@ -1,4 +1,4 @@
-# Copyright The IETF Trust 2007-2022, All Rights Reserved
+# Copyright The IETF Trust 2007-2023, All Rights Reserved
 # -*- coding: utf-8 -*-
 
 
@@ -10,7 +10,7 @@ from django.contrib import messages
 from django.db.models import Q
 from django.forms.models import inlineformset_factory, model_to_dict
 from django.forms.formsets import formset_factory
-from django.http import HttpResponse, Http404, HttpResponseRedirect
+from django.http import HttpResponse, Http404, HttpResponseRedirect, HttpResponseBadRequest
 from django.shortcuts import render, get_object_or_404, redirect
 from django.template.loader import render_to_string
 from django.urls import reverse as urlreverse
@@ -18,7 +18,7 @@ from django.utils.html import escape
 
 import debug                            # pyflakes:ignore
 
-from ietf.doc.models import DocAlias
+from ietf.doc.models import Document
 from ietf.group.models import Role, Group
 from ietf.ietfauth.utils import role_required, has_role
 from ietf.ipr.mail import (message_from_message, get_reply_to, get_update_submitter_emails)
@@ -38,7 +38,7 @@ from ietf.message.models import Message
 from ietf.message.utils import infer_message
 from ietf.name.models import IprLicenseTypeName
 from ietf.person.models import Person
-from ietf.secr.utils.document import get_rfc_num, is_draft
+from ietf.utils import log
 from ietf.utils.draft_search import normalize_draftname
 from ietf.utils.mail import send_mail, send_mail_message
 from ietf.utils.response import permission_denied
@@ -69,12 +69,15 @@ def get_document_emails(ipr):
     has been posted"""
     messages = []
     for rel in ipr.iprdocrel_set.all():
-        doc = rel.document.document
+        doc = rel.document
 
-        if is_draft(doc):
+        if doc.type_id=="draft":
             doc_info = 'Internet-Draft entitled "{}" ({})'.format(doc.title,doc.name)
+        elif doc.type_id=="rfc":
+            doc_info = 'RFC entitled "{}" (RFC{})'.format(doc.title, doc.rfc_number)
         else:
-            doc_info = 'RFC entitled "{}" (RFC{})'.format(doc.title,get_rfc_num(doc))
+            log.unreachable("2023-08-15")
+            return ""
 
         addrs = gather_address_lists('ipr_posted_on_doc',doc=doc).as_strings(compact=False)
 
@@ -269,7 +272,7 @@ def add_email(request, id):
 @role_required('Secretariat',)
 def admin(request, state):
     """Administrative disclosure listing.  For non-posted disclosures"""
-    states = IprDisclosureStateName.objects.filter(slug__in=[state, "rejected"] if state == "removed" else [state])
+    states = IprDisclosureStateName.objects.filter(slug__in=[state, "rejected", "removed_objfalse"] if state == "removed" else [state])
     if not states:
         raise Http404
 
@@ -442,58 +445,35 @@ def history(request, id):
         'selected_tab_entry':'history'
     })
 
-def by_draft_txt(request):
-    docipr = {}
 
-    for o in IprDocRel.objects.filter(disclosure__state='posted').select_related('document'):
-        name = o.document.name
-        if name.startswith("rfc"):
-            name = name.upper()
-
-        if not name in docipr:
-            docipr[name] = []
-
-        docipr[name].append(o.disclosure_id)
-
-    lines = [ "# Machine-readable list of IPR disclosures by draft name" ]
-    for name, iprs in docipr.items():
-        lines.append(name + "\t" + "\t".join(str(ipr_id) for ipr_id in sorted(iprs)))
-
-    return HttpResponse("\n".join(lines), content_type="text/plain; charset=%s"%settings.DEFAULT_CHARSET)
-
-def by_draft_recursive_txt(request):
-    """Returns machine-readable list of IPR disclosures by draft name, recursive.
-    NOTE: this view is expensive and should be removed _after_ tools.ietf.org is retired,
-    including util function and management commands that generate the content for
-    this view."""
-
-    with open('/a/ietfdata/derived/ipr_draft_recursive.txt') as f:
-        content = f.read()
-    return HttpResponse(content, content_type="text/plain; charset=%s"%settings.DEFAULT_CHARSET)
-
-
-def new(request, type, updates=None):
+def new(request, _type, updates=None):
     """Submit a new IPR Disclosure.  If the updates field != None, this disclosure
     updates one or more other disclosures."""
     # Note that URL patterns won't ever send updates - updates is only non-null when called from code
 
     # This odd construct flipping generic and general allows the URLs to say 'general' while having a minimal impact on the code.
     # A cleanup to change the code to switch on type 'general' should follow.
-    if type == 'generic' and updates: # Only happens when called directly from the updates view
+    if (
+        _type == "generic" and updates
+    ):  # Only happens when called directly from the updates view
         pass
-    elif type == 'generic':
-        return HttpResponseRedirect(urlreverse('ietf.ipr.views.new',kwargs=dict(type='general')))
-    elif type == 'general':
-        type = 'generic'
+    elif _type == "generic":
+        return HttpResponseRedirect(
+            urlreverse("ietf.ipr.views.new", kwargs=dict(_type="general"))
+        )
+    elif _type == "general":
+        _type = "generic"
     else:
         pass
 
     # 1 to show initially + the template
-    DraftFormset = inlineformset_factory(IprDisclosureBase, IprDocRel, form=DraftForm, can_delete=False, extra=1 + 1)
+    DraftFormset = inlineformset_factory(
+        IprDisclosureBase, IprDocRel, form=DraftForm, can_delete=False, extra=1 + 1
+    )
 
-    if request.method == 'POST':
-        form = ipr_form_mapping[type](request.POST)
-        if type != 'generic':
+    if request.method == "POST":
+        form = ipr_form_mapping[_type](request.POST)
+        if _type != "generic":
             draft_formset = DraftFormset(request.POST, instance=IprDisclosureBase())
         else:
             draft_formset = None
@@ -502,72 +482,92 @@ def new(request, type, updates=None):
             person = Person.objects.get(name="(System)")
         else:
             person = request.user.person
-            
+
         # check formset validity
-        if type != 'generic':
+        if _type != "generic":
             valid_formsets = draft_formset.is_valid()
         else:
             valid_formsets = True
-            
+
         if form.is_valid() and valid_formsets:
-            if 'updates' in form.cleaned_data:
-                updates = form.cleaned_data['updates']
-                del form.cleaned_data['updates']
+            if "updates" in form.cleaned_data:
+                updates = form.cleaned_data["updates"]
+                del form.cleaned_data["updates"]
             disclosure = form.save(commit=False)
             disclosure.by = person
-            disclosure.state = IprDisclosureStateName.objects.get(slug='pending')
+            disclosure.state = IprDisclosureStateName.objects.get(slug="pending")
             disclosure.save()
-            
-            if type != 'generic':
+
+            if _type != "generic":
                 draft_formset = DraftFormset(request.POST, instance=disclosure)
                 draft_formset.save()
 
             set_disclosure_title(disclosure)
             disclosure.save()
-            
+
             if updates:
                 for ipr in updates:
-                    RelatedIpr.objects.create(source=disclosure,target=ipr,relationship_id='updates')
-                
+                    RelatedIpr.objects.create(
+                        source=disclosure, target=ipr, relationship_id="updates"
+                    )
+
             # create IprEvent
             IprEvent.objects.create(
-                type_id='submitted',
+                type_id="submitted",
                 by=person,
                 disclosure=disclosure,
-                desc="Disclosure Submitted")
+                desc="Disclosure Submitted",
+            )
 
             # send email notification
-            (to, cc) = gather_address_lists('ipr_disclosure_submitted')
-            send_mail(request, to, ('IPR Submitter App', 'ietf-ipr@ietf.org'),
-                'New IPR Submission Notification',
+            (to, cc) = gather_address_lists("ipr_disclosure_submitted")
+            send_mail(
+                request,
+                to,
+                ("IPR Submitter App", "ietf-ipr@ietf.org"),
+                "New IPR Submission Notification",
                 "ipr/new_update_email.txt",
-                {"ipr": disclosure,},
-                cc=cc)
-            
+                {
+                    "ipr": disclosure,
+                },
+                cc=cc,
+            )
+
             return render(request, "ipr/submitted.html")
 
     else:
         if updates:
             original = IprDisclosureBase(id=updates).get_child()
             initial = model_to_dict(original)
-            initial.update({'updates':str(updates), })
-            patent_info = text_to_dict(initial.get('patent_info', ''))
+            initial.update(
+                {
+                    "updates": str(updates),
+                }
+            )
+            patent_info = text_to_dict(initial.get("patent_info", ""))
             if list(patent_info.keys()):
-                patent_dict = dict([ ('patent_'+k.lower(), v) for k,v in list(patent_info.items()) ])
+                patent_dict = dict(
+                    [("patent_" + k.lower(), v) for k, v in list(patent_info.items())]
+                )
             else:
-                patent_dict = {'patent_notes': initial.get('patent_info', '')}
+                patent_dict = {"patent_notes": initial.get("patent_info", "")}
             initial.update(patent_dict)
-            form = ipr_form_mapping[type](initial=initial)
+            form = ipr_form_mapping[_type](initial=initial)
         else:
-            form = ipr_form_mapping[type]()
-        disclosure = IprDisclosureBase()    # dummy disclosure for inlineformset
+            form = ipr_form_mapping[_type]()
+        disclosure = IprDisclosureBase()  # dummy disclosure for inlineformset
         draft_formset = DraftFormset(instance=disclosure)
 
-    return render(request, "ipr/details_edit.html",  {
-        'form': form,
-        'draft_formset':draft_formset,
-        'type':type,
-    })
+    return render(
+        request,
+        "ipr/details_edit.html",
+        {
+            "form": form,
+            "draft_formset": draft_formset,
+            "type": _type,
+        },
+    )
+
 
 @role_required('Secretariat',)
 def notify(request, id, type):
@@ -629,11 +629,16 @@ def post(request, id):
     
 def search(request):
     search_type = request.GET.get("submit")
+    if search_type and "\x00" in search_type:
+        return HttpResponseBadRequest("Null characters are not allowed")
+
     # query field
     q = ''
     # legacy support
     if not search_type and request.GET.get("option", None) == "document_search":
         docname = request.GET.get("document_search", "")
+        if docname and "\x00" in docname:
+            return HttpResponseBadRequest("Null characters are not allowed")
         if docname.startswith("draft-"):
             search_type = "draft"
             q = docname
@@ -643,18 +648,24 @@ def search(request):
     if search_type:
         form = SearchForm(request.GET)
         docid = request.GET.get("id") or request.GET.get("id_document_tag") or ""
+        if docid and "\x00" in docid:
+            return HttpResponseBadRequest("Null characters are not allowed")
         docs = doc = None
         iprs = []
         related_iprs = []
 
         # set states
-        states = request.GET.getlist('state',('posted','removed'))
+        states = request.GET.getlist('state',settings.PUBLISH_IPR_STATES)
+        if any("\x00" in state for state in states if state):
+            return HttpResponseBadRequest("Null characters are not allowed")
         if states == ['all']:
             states = IprDisclosureStateName.objects.values_list('slug',flat=True)
         
         # get query field
         if request.GET.get(search_type):
             q = request.GET.get(search_type)
+            if q and "\x00" in q:
+                return HttpResponseBadRequest("Null characters are not allowed")
 
         if q or docid:
             # Search by RFC number or draft-identifier
@@ -663,23 +674,53 @@ def search(request):
                 doc = q
 
                 if docid:
-                    start = DocAlias.objects.filter(name__iexact=docid)
+                    start = Document.objects.filter(name__iexact=docid)
                 else:
                     if search_type == "draft":
                         q = normalize_draftname(q)
-                        start = DocAlias.objects.filter(name__icontains=q, name__startswith="draft")
+                        start = Document.objects.filter(name__icontains=q, name__startswith="draft")
                     elif search_type == "rfc":
-                        start = DocAlias.objects.filter(name="rfc%s" % q.lstrip("0"))
+                        start = Document.objects.filter(name="rfc%s" % q.lstrip("0"))
                 
                 # one match
                 if len(start) == 1:
                     first = start[0]
-                    doc = first.document
-                    docs = related_docs(first)
-                    iprs = iprs_from_docs(docs,states=states)
+                    doc = first
+                    docs = set([first])
+                    docs.update(
+                        related_docs(
+                            first, relationship=("replaces", "obs"), reverse_relationship=()
+                        )
+                    )
+                    docs.update(
+                        set(
+                            [
+                                draft
+                                for drafts in [
+                                    related_docs(
+                                        d, relationship=(), reverse_relationship=("became_rfc",)
+                                    )
+                                    for d in docs
+                                ]
+                                for draft in drafts
+                            ]
+                        )
+                    )
+                    docs.discard(None)
+                    docs = sorted(
+                        docs,
+                        key=lambda d: (
+                            d.rfc_number if d.rfc_number is not None else 0,
+                            d.became_rfc().rfc_number if d.became_rfc() else 0,
+                        ),
+                        reverse=True,
+                    )
+                    iprs = iprs_from_docs(docs, states=states)
                     template = "ipr/search_doc_result.html"
-                    updated_docs = related_docs(first, ('updates',))
-                    related_iprs = list(set(iprs_from_docs(updated_docs, states=states)) - set(iprs))
+                    updated_docs = related_docs(first, ("updates",))
+                    related_iprs = list(
+                        set(iprs_from_docs(updated_docs, states=states)) - set(iprs)
+                    )
                 # multiple matches, select just one
                 elif start:
                     docs = start
@@ -706,27 +747,27 @@ def search(request):
             # Search by wg acronym
             # Document list with IPRs
             elif search_type == "group":
-                docs = list(DocAlias.objects.filter(docs__group=q))
+                docs = list(Document.objects.filter(group=q))
                 related = []
                 for doc in docs:
                     doc.product_of_this_wg = True
                     related += related_docs(doc)
                 iprs = iprs_from_docs(list(set(docs+related)),states=states)
-                docs = [ doc for doc in docs if doc.document.ipr() ]
-                docs = sorted(docs, key=lambda x: max([ipr.disclosure.time for ipr in x.document.ipr()]), reverse=True)
+                docs = [ doc for doc in docs if doc.ipr() ]
+                docs = sorted(docs, key=lambda x: max([ipr.disclosure.time for ipr in x.ipr()]), reverse=True)
                 template = "ipr/search_wg_result.html"
                 q = Group.objects.get(id=q).acronym     # make acronym for use in template
 
             # Search by rfc and id title
             # Document list with IPRs
             elif search_type == "doctitle":
-                docs = list(DocAlias.objects.filter(docs__title__icontains=q))
+                docs = list(Document.objects.filter(title__icontains=q))
                 related = []
                 for doc in docs:
                     related += related_docs(doc)
                 iprs = iprs_from_docs(list(set(docs+related)),states=states)
-                docs = [ doc for doc in docs if doc.document.ipr() ]
-                docs = sorted(docs, key=lambda x: max([ipr.disclosure.time for ipr in x.document.ipr()]), reverse=True)
+                docs = [ doc for doc in docs if doc.ipr() ]
+                docs = sorted(docs, key=lambda x: max([ipr.disclosure.time for ipr in x.ipr()]), reverse=True)
                 template = "ipr/search_doctitle_result.html"
 
             # Search by title of IPR disclosure
@@ -778,7 +819,7 @@ def show(request, id):
     """View of individual declaration"""
     ipr = get_object_or_404(IprDisclosureBase, id=id).get_child()
     if not has_role(request.user, 'Secretariat'):
-        if ipr.state.slug == 'removed':
+        if ipr.state.slug in ['removed', 'removed_objfalse']:
             return render(request, "ipr/removed.html", {
                 'ipr': ipr
             })
@@ -801,10 +842,10 @@ def show(request, id):
 
 def showlist(request):
     """List all disclosures by type, posted only"""
-    generic = GenericIprDisclosure.objects.filter(state__in=('posted','removed')).prefetch_related('relatedipr_source_set__target','relatedipr_target_set__source').order_by('-time')
-    specific = HolderIprDisclosure.objects.filter(state__in=('posted','removed')).prefetch_related('relatedipr_source_set__target','relatedipr_target_set__source').order_by('-time')
-    thirdpty = ThirdPartyIprDisclosure.objects.filter(state__in=('posted','removed')).prefetch_related('relatedipr_source_set__target','relatedipr_target_set__source').order_by('-time')
-    nondocspecific = NonDocSpecificIprDisclosure.objects.filter(state__in=('posted','removed')).prefetch_related('relatedipr_source_set__target','relatedipr_target_set__source').order_by('-time')
+    generic = GenericIprDisclosure.objects.filter(state__in=settings.PUBLISH_IPR_STATES).prefetch_related('relatedipr_source_set__target','relatedipr_target_set__source').order_by('-time')
+    specific = HolderIprDisclosure.objects.filter(state__in=settings.PUBLISH_IPR_STATES).prefetch_related('relatedipr_source_set__target','relatedipr_target_set__source').order_by('-time')
+    thirdpty = ThirdPartyIprDisclosure.objects.filter(state__in=settings.PUBLISH_IPR_STATES).prefetch_related('relatedipr_source_set__target','relatedipr_target_set__source').order_by('-time')
+    nondocspecific = NonDocSpecificIprDisclosure.objects.filter(state__in=settings.PUBLISH_IPR_STATES).prefetch_related('relatedipr_source_set__target','relatedipr_target_set__source').order_by('-time')
     
     # combine nondocspecific with generic and re-sort
     generic = itertools.chain(generic,nondocspecific)
