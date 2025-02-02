@@ -1,4 +1,4 @@
-{# Copyright The IETF Trust 2015, All Rights Reserved #}
+{# Copyright The IETF Trust 2015-2024, All Rights Reserved #}
 {% load origin %}
 {% origin %}
 {% load ietf_filters %}
@@ -11,14 +11,14 @@
             <div id="{{ entry.group.acronym }}">
                 <a href="{% url 'ietf.group.views.group_home' acronym=entry.group.acronym %}">{{ entry.group.acronym }}</a>
             </div>
-            {% if entry.group.state_id == "bof" %}<span class="badge rounded-pill bg-success">BOF</span>{% endif %}
+            {% if entry.group.state_id == "bof" %}<span class="badge rounded-pill text-bg-success">BOF</span>{% endif %}
         {% else %}
             <h1>{{ entry.group }}</h1>
         {% endif %}
     </td>
     {% if entry.canceled %}
         <td colspan="4">
-            <span class="badge rounded-pill bg-danger">Session cancelled</span>
+            <span class="badge rounded-pill text-bg-danger">Session cancelled</span>
         </td>
     {% else %}
         {# artifacts #}
@@ -31,7 +31,7 @@
                 <br>
             {% empty %}
                 {% if show_agenda and not meeting.proceedings_final %}
-                    <span class="badge rounded-pill bg-warning">No agenda</span>
+                    <span class="badge rounded-pill text-bg-warning">No agenda</span>
                     <br>
                 {% endif %}
             {% endfor %}
@@ -43,14 +43,38 @@
                 <br>
             {% empty %}
                 {% if show_agenda and not meeting.proceedings_final %}
-                    <span class="badge rounded-pill bg-warning">No minutes</span>
+                    <span class="badge rounded-pill text-bg-warning">No minutes</span>
                     <br>
                 {% endif %}
             {% endfor %}
-            {% for bs in entry.bluesheets %}
-                <a href="{{ bs.material|meeting_href:meeting }}">
-                    Bluesheets
-                    {% if bs.time %}{{ bs.time|date:"D G:i" }}{% endif %}
+            {% if not meeting.proceedings_final %}
+                {% for attendance in entry.attendances %}
+                    {% with session=attendance.material %}
+                        <a href="{% url 'ietf.meeting.views.session_attendance' session_id=session.pk num=session.meeting.number %}">
+                            Attendance
+                            {% if attendance.time %}{{ attendance.time|date:"D G:i" }}{% endif %}
+                        </a>
+                    {% endwith %}
+                    <br>
+                {% endfor %}
+            {% else %}
+                {% for bs in entry.bluesheets %}
+                    <a href="{{ bs.material|meeting_href:meeting }}">
+                        Bluesheets
+                        {% if bs.time %}{{ bs.time|date:"D G:i" }}{% endif %}
+                    </a>
+                    <br>
+                {% endfor %}
+            {% endif %}
+            {% for chatlog in entry.chatlogs %}
+                <a href="{{ chatlog.material|meeting_href:meeting }}">
+                    Chatlog
+                    {% if chatlog.time %}{{chatlog.time|date:"D G:i"}}{% endif %}
+                </a>
+                <br>
+            {% empty %}
+                <a href="{{ entry.session.chat_archive_url }}">
+                    Chatlog
                 </a>
                 <br>
             {% endfor %}
@@ -64,6 +88,13 @@
               </a>
               <br>
           {% endfor %}
+          {% for rec in entry.meetecho_recordings %}
+              <a href="{{ rec.material }}">
+                  Session recording 
+                  {% if rec.time %}{{ rec.time|date:"D G:i"}}{% endif %}
+              </a>
+              <br>
+          {% endfor%}
         </td>
         {# slides #}
         <td>
@@ -71,18 +102,18 @@
                 <a href="{{ slide.material|meeting_href:meeting }}">{{ slide.material.title|clean_whitespace }}</a>
                 <br>
             {% empty %}
-                {% if not meeting.proceedings_final %}<span class="badge rounded-pill bg-warning">No slides</span>{% endif %}
+                {% if not meeting.proceedings_final %}<span class="badge rounded-pill text-bg-warning">No slides</span>{% endif %}
             {% endfor %}
         </td>
         {# drafts #}
         <td>
             {% for draft in entry.drafts %}
-                <a href="{% url "ietf.doc.views_doc.document_main" name=draft.material.canonical_name %}">
-                    {{ draft.material.canonical_name }}
+                <a href="{% url "ietf.doc.views_doc.document_main" name=draft.material.name %}">
+                    {{ draft.material.name }}
                 </a>
                 <br>
             {% empty %}
-                {% if not meeting.proceedings_final %}<span class="badge rounded-pill bg-warning">No Internet-Drafts</span>{% endif %}
+                {% if not meeting.proceedings_final %}<span class="badge rounded-pill text-bg-warning">No Internet-Drafts</span>{% endif %}
             {% endfor %}
         </td>
     {% endif %}

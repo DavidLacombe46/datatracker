@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
     app:
         build:
@@ -26,7 +24,7 @@ services:
             # UID: 1001
             # GID: 1001
             # DATADIR: data
-            # DJANGO_SETTINGS_MODULE: settings_postgrestest
+            # DJANGO_SETTINGS_MODULE: settings_test
         
         # Uncomment the next line to use a non-root user for all processes.
         # user: dev
@@ -74,7 +72,7 @@ services:
             CELERY_APP: ietf
             CELERY_ROLE: worker
             UPDATE_REQUIREMENTS_FROM: requirements.txt
-            DEV_MODE: yes
+            DEV_MODE: "yes"
         command:
             - '--loglevel=INFO'
         depends_on:

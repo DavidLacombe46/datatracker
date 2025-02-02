@@ -13,9 +13,10 @@ from ietf.group.factories import GroupFactory, RoleFactory
 from ietf.meeting.models import Session, ResourceAssociation, SchedulingEvent, Constraint
 from ietf.meeting.factories import MeetingFactory, SessionFactory
 from ietf.name.models import ConstraintName, TimerangeName
+from ietf.person.factories import PersonFactory
 from ietf.person.models import Person
 from ietf.secr.sreq.forms import SessionForm
-from ietf.utils.mail import outbox, empty_outbox, get_payload_text
+from ietf.utils.mail import outbox, empty_outbox, get_payload_text, send_mail
 from ietf.utils.timezone import date_today
 
 
@@ -77,6 +78,32 @@ class SessionRequestTestCase(TestCase):
         r = self.client.get(url)
         self.assertRedirects(r,reverse('ietf.secr.sreq.views.main'))
         self.assertEqual(SchedulingEvent.objects.filter(session=session).order_by('-id')[0].status_id, 'deleted')
+
+    def test_cancel_notification_msg(self):
+        to = "<iesg-secretary@ietf.org>"
+        subject = "Dummy subject"
+        template = "sreq/session_cancel_notification.txt"
+        meeting = MeetingFactory(type_id="ietf", date=date_today())
+        requester = PersonFactory(name="James O'Rourke", user__username="jimorourke")
+        context = {"meeting": meeting, "requester": requester}
+        cc = "cc.a@example.com, cc.b@example.com"
+        bcc = "bcc@example.com"
+
+        msg = send_mail(
+            None,
+            to,
+            None,
+            subject,
+            template,
+            context,
+            cc=cc,
+            bcc=bcc,
+        )
+        self.assertEqual(requester.name, "James O'Rourke")  # note ' (single quote) in the name
+        self.assertIn(
+            f"A request to cancel a meeting session has just been submitted by {requester.name}.",
+            get_payload_text(msg),
+        )
 
     def test_edit(self):
         meeting = MeetingFactory(type_id='ietf', date=date_today())
@@ -165,7 +192,8 @@ class SessionRequestTestCase(TestCase):
         self.assertContains(r, 'Schedule the sessions on subsequent days')
         self.assertContains(r, 'Thursday early afternoon, Thursday late afternoon')
         self.assertContains(r, group2.acronym)
-        self.assertContains(r, 'Second session with: {} {}'.format(group3.acronym, group4.acronym))
+        # The sessions can be in any order in the HTML, deal with that
+        self.assertRegex(r.content.decode(), r'Second session with: ({} {}|{} {})'.format(group3.acronym, group4.acronym, group4.acronym, group3.acronym))
 
         # check that a notification was sent
         self.assertEqual(len(outbox), 1)
@@ -699,6 +727,33 @@ class SubmitRequestCase(TestCase):
         self.assertIn('1 Hour, 1 Hour', notification_payload)
         self.assertNotIn('1 Hour, 1 Hour, 1 Hour', notification_payload)
         self.assertNotIn('The third session requires your approval', notification_payload)
+
+    def test_request_notification_msg(self):
+        to = "<iesg-secretary@ietf.org>"
+        subject = "Dummy subject"
+        template = "sreq/session_request_notification.txt"
+        header = "A new"
+        meeting = MeetingFactory(type_id="ietf", date=date_today())
+        requester = PersonFactory(name="James O'Rourke", user__username="jimorourke")
+        context = {"header": header, "meeting": meeting, "requester": requester}
+        cc = "cc.a@example.com, cc.b@example.com"
+        bcc = "bcc@example.com"
+
+        msg = send_mail(
+            None,
+            to,
+            None,
+            subject,
+            template,
+            context,
+            cc=cc,
+            bcc=bcc,
+        )
+        self.assertEqual(requester.name, "James O'Rourke")  # note ' (single quote) in the name
+        self.assertIn(
+            f"{header} meeting session request has just been submitted by {requester.name}.",
+            get_payload_text(msg),
+        )
 
     def test_request_notification_third_session(self):
         meeting = MeetingFactory(type_id='ietf', date=date_today())

@@ -36,8 +36,8 @@ def clean_duplicates(addrlist):
 class MailTrigger(models.Model):
     slug = models.CharField(max_length=64, primary_key=True)
     desc = models.TextField(blank=True)
-    to   = models.ManyToManyField('Recipient', blank=True, related_name='used_in_to')
-    cc   = models.ManyToManyField('Recipient', blank=True, related_name='used_in_cc')
+    to   = models.ManyToManyField('mailtrigger.Recipient', blank=True, related_name='used_in_to')
+    cc   = models.ManyToManyField('mailtrigger.Recipient', blank=True, related_name='used_in_cc')
 
     class Meta:
         ordering = ["slug"]
@@ -96,35 +96,35 @@ class Recipient(models.Model):
         addrs = []
         if 'doc' in kwargs:
             for reldoc in kwargs['doc'].related_that_doc(('conflrev','tohist','tois','tops')):
-                addrs.extend(Recipient.objects.get(slug='doc_authors').gather(**{'doc':reldoc.document}))
+                addrs.extend(Recipient.objects.get(slug='doc_authors').gather(**{'doc':reldoc}))
         return addrs
 
     def gather_doc_affecteddoc_group_chairs(self, **kwargs):
         addrs = []
         if 'doc' in kwargs:
             for reldoc in kwargs['doc'].related_that_doc(('conflrev','tohist','tois','tops')):
-                addrs.extend(Recipient.objects.get(slug='doc_group_chairs').gather(**{'doc':reldoc.document}))
+                addrs.extend(Recipient.objects.get(slug='doc_group_chairs').gather(**{'doc':reldoc}))
         return addrs
 
     def gather_doc_affecteddoc_notify(self, **kwargs):
         addrs = []
         if 'doc' in kwargs:
             for reldoc in kwargs['doc'].related_that_doc(('conflrev','tohist','tois','tops')):
-                addrs.extend(Recipient.objects.get(slug='doc_notify').gather(**{'doc':reldoc.document}))
+                addrs.extend(Recipient.objects.get(slug='doc_notify').gather(**{'doc':reldoc}))
         return addrs
 
     def gather_conflict_review_stream_manager(self, **kwargs):
         addrs = []
         if 'doc' in kwargs:
             for reldoc in kwargs['doc'].related_that_doc(('conflrev',)):
-                addrs.extend(Recipient.objects.get(slug='doc_stream_manager').gather(**{'doc':reldoc.document}))
+                addrs.extend(Recipient.objects.get(slug='doc_stream_manager').gather(**{'doc':reldoc}))
         return addrs
 
     def gather_conflict_review_steering_group(self,**kwargs):
         addrs = []
         if 'doc' in kwargs:
             for reldoc in kwargs['doc'].related_that_doc(('conflrev',)):
-                if reldoc.document.stream_id=='irtf':
+                if reldoc.stream_id=='irtf':
                     addrs.append('"Internet Research Steering Group" <irsg@irtf.org>')
         return addrs
 
@@ -138,16 +138,16 @@ class Recipient(models.Model):
     def gather_stream_managers(self, **kwargs):
         addrs = []
         manager_map = dict(
-            ise  = '<rfc-ise@rfc-editor.org>',
-            irtf = '<irtf-chair@irtf.org>',
-            ietf = '<iesg@ietf.org>',
-            iab  = '<iab-chair@iab.org>',
+            ise  = ['<rfc-ise@rfc-editor.org>'],
+            irtf = ['<irtf-chair@irtf.org>'],
+            ietf = ['<iesg@ietf.org>'],
+            iab  = ['<iab-chair@iab.org>'],
             editorial = Role.objects.filter(group__acronym="rsab",name_id="chair").values_list("email__address", flat=True),
         )
         if 'streams' in kwargs:
             for stream in kwargs['streams']:
                 if stream in manager_map:
-                    addrs.append(manager_map[stream])
+                    addrs.extend(manager_map[stream])
         return addrs
 
     def gather_doc_stream_manager(self, **kwargs):
@@ -234,7 +234,7 @@ class Recipient(models.Model):
                 try:
                     submitter = Alias.objects.get(name=submission.submitter).person
                     if submitter and submitter.email():
-                        addrs.extend(["%s <%s>" % (submitter.name, submitter.email().address)])
+                        addrs.append(f"{submitter.name} <{submitter.email().address}>")
                 except (Alias.DoesNotExist, Alias.MultipleObjectsReturned):
                     pass
         return addrs

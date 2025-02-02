@@ -1,4 +1,4 @@
-# Copyright The IETF Trust 2014-2020, All Rights Reserved
+# Copyright The IETF Trust 2014-2023, All Rights Reserved
 # -*- coding: utf-8 -*-
 
 
@@ -14,7 +14,7 @@ from django.utils.encoding import force_str
 import debug                            # pyflakes:ignore
 
 from ietf.group.models import Group
-from ietf.doc.fields import SearchableDocAliasField
+from ietf.doc.fields import SearchableDocumentField
 from ietf.ipr.mail import utc_from_string
 from ietf.ipr.fields import SearchableIprDisclosuresField
 from ietf.ipr.models import (IprDocRel, IprDisclosureBase, HolderIprDisclosure,
@@ -95,7 +95,7 @@ class AddEmailForm(forms.Form):
         return self.cleaned_data
 
 class DraftForm(forms.ModelForm):
-    document = SearchableDocAliasField(label="I-D name/RFC number", required=True, doc_type="draft")
+    document = SearchableDocumentField(label="I-D name/RFC number", required=True, doc_type="all")
 
     class Meta:
         model = IprDocRel
@@ -104,6 +104,17 @@ class DraftForm(forms.ModelForm):
             'sections': forms.TextInput(),
         }
         help_texts = { 'sections': 'Sections' }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        revisions = cleaned_data.get("revisions")
+        document = cleaned_data.get("document")
+        if not document:
+            self.add_error("document", "Identifying the Internet-Draft or RFC for this disclosure is required.")
+        elif not document.name.startswith("rfc"):
+            if revisions is None or revisions.strip() == "":
+                self.add_error("revisions", "Revisions of this Internet-Draft for which this disclosure is relevant must be specified.")
+        return cleaned_data
 
 patent_number_help_text = "Enter one or more comma-separated patent publication or application numbers as two-letter country code and serial number, e.g.: US62/123456 or WO2017123456. Do not include thousands-separator commas in serial numbers.  It is preferable to use individual disclosures for each patent, even if this field permits multiple patents to be listed, in order to get inventor, title, and date information below correct." 
 validate_patent_number = RegexValidator(
@@ -327,7 +338,19 @@ class IprDisclosureFormBase(forms.ModelForm):
 
         return cleaned_data
 
+
 class HolderIprDisclosureForm(IprDisclosureFormBase):
+    is_blanket_disclosure = forms.BooleanField(
+        label=mark_safe(
+            'This is a blanket IPR disclosure '
+            '(see Section 5.4.3 of <a href="https://www.ietf.org/rfc/rfc8179.txt">RFC 8179</a>)'
+        ),
+        help_text="In satisfaction of its disclosure obligations, Patent Holder commits to license all of "
+                  "IPR (as defined in RFC 8179) that would have required disclosure under RFC 8179 on a "
+                  "royalty-free (and otherwise reasonable and non-discriminatory) basis. Patent Holder "
+                  "confirms that all other terms and conditions are described in this IPR disclosure.",
+        required=False,
+    )
     licensing = CustomModelChoiceField(IprLicenseTypeName.objects.all(),
         widget=forms.RadioSelect,empty_label=None)
 
@@ -345,6 +368,15 @@ class HolderIprDisclosureForm(IprDisclosureFormBase):
         else:
             # entering new disclosure
             self.fields['licensing'].queryset = IprLicenseTypeName.objects.exclude(slug='none-selected')
+        
+        if self.data.get("is_blanket_disclosure", False):
+            # for a blanket disclosure, patent details are not required
+            self.fields["patent_number"].required = False
+            self.fields["patent_inventor"].required = False
+            self.fields["patent_title"].required = False
+            self.fields["patent_date"].required = False
+            # n.b., self.fields["patent_notes"] is never required
+
             
     def clean(self):
         cleaned_data = super(HolderIprDisclosureForm, self).clean()
